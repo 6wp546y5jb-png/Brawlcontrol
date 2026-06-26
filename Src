@@ -1,0 +1,80 @@
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+
+local player = Players.LocalPlayer
+local touchZone = script.Parent:WaitForChild("LeftTouchZone")
+local outerCircle = script.Parent:WaitForChild("JoystickOuter")
+local stick = outerCircle:WaitForChild("JoystickStick")
+
+local activeTouchInput = nil
+local joystickCenter = Vector2.new(0, 0)
+
+-- iPad Pro M4 Ergonomic Settings
+local maxRadius = 80    -- Perfect travel distance for a large tablet screen
+local minPaddingX = 80  -- Prevents joystick from spawning too close to the left edge
+local minPaddingY = 100 -- Prevents joystick from spawning too close to the top/bottom edges
+
+-- Function to handle character movement
+local function updateMovement(directionVector)
+    local character = player.Character
+    if character then
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            -- Moves the player relative to the camera direction
+            humanoid:Move(Vector3.new(directionVector.X, 0, directionVector.Y), true)
+        end
+    end
+end
+
+-- 1. Detect Touch & Spawn Joystick Dynamically (With iPad Pro Padding)
+touchZone.InputBegan:Connect(function(input, processed)
+    if input.UserInputType == Enum.UserInputType.Touch and not activeTouchInput then
+        activeTouchInput = input
+        
+        local touchX = input.Position.X
+        local touchY = input.Position.Y
+        local screenHeight = workspace.CurrentCamera.ViewportSize.Y
+        
+        -- Clamp the center so it never spawns in an uncomfortable bezel corner
+        local clampedX = math.max(minPaddingX, touchX)
+        local clampedY = math.clamp(touchY, minPaddingY, screenHeight - minPaddingY)
+        
+        joystickCenter = Vector2.new(clampedX, clampedY)
+        
+        -- Position the UI instantly at the comfortable touch point
+        outerCircle.Position = UDim2.new(0, joystickCenter.X, 0, joystickCenter.Y)
+        stick.Position = UDim2.new(0.5, 0, 0.5, 0) -- Reset inner knob to center
+        outerCircle.Visible = true
+    end
+end)
+
+-- 2. Track Thumb Dragging (Calculates direction and limits movement to maxRadius)
+UserInputService.InputChanged:Connect(function(input, processed)
+    if input == activeTouchInput and input.UserInputType == Enum.UserInputType.Touch then
+        local currentPos = Vector2.new(input.Position.X, input.Position.Y)
+        local direction = currentPos - joystickCenter
+        local distance = direction.Magnitude
+        
+        -- Keep the inner stick contained within the maximum radius
+        if distance > maxRadius then
+            direction = direction.Unit * maxRadius
+            distance = maxRadius
+        end
+        
+        -- Update visual stick position (Offsetting from the 0.5, 0.5 center anchor)
+        stick.Position = UDim2.new(0.5, direction.X, 0.5, direction.Y)
+        
+        -- Convert to a normalized vector (-1 to 1) for Roblox character movement
+        local moveVector = direction / maxRadius
+        updateMovement(moveVector)
+    end
+end)
+
+-- 3. Reset and Hide when thumb lifts off the screen
+UserInputService.InputEnded:Connect(function(input, processed)
+    if input == activeTouchInput then
+        activeTouchInput = nil
+        outerCircle.Visible = false -- Hide like Brawl Stars does
+        updateMovement(Vector2.new(0, 0)) -- Stop character movement completely
+    end
+end)
