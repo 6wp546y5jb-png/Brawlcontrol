@@ -3,9 +3,55 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
-local touchZone = script.Parent:WaitForChild("LeftTouchZone")
-local outerCircle = script.Parent:WaitForChild("JoystickOuter")
-local stick = outerCircle:WaitForChild("JoystickStick")
+
+-- --- EXECUTOR BYPASS: FORCE HIDE DEFAULT ROBLOX JOYSTICK ---
+local function killDefaultJoystick()
+    local playerGui = player:FindFirstChildOfClass("PlayerGui")
+    if playerGui then
+        -- Target the native Roblox Touch UI container
+        local touchGui = playerGui:FindFirstChild("TouchGui")
+        if touchGui then
+            touchGui.Enabled = false
+            -- If the game tries to re-enable it, we hide the inner touch frames directly
+            local touchControlFrame = touchGui:FindFirstChild("TouchControlFrame")
+            if touchControlFrame then
+                touchControlFrame.Visible = false
+            end
+        end
+    end
+end
+
+-- Run it immediately and keep checking if the game tries to respawn it
+task.spawn(function()
+    while task.wait(0.5) do
+        killDefaultJoystick()
+    end
+end)
+
+-- --- EXECUTOR BYPASS: DYNAMICALLY CREATE THE BRAWL STARS UI HOOKS ---
+-- Since you are a player, you might not have "LeftTouchZone" or the layout ready. 
+-- This section automatically creates the Brawl Stars UI safely on your screen.
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "BrawlStarsJoystickBypass"
+screenGui.ResetOnSpawn = false
+screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local touchZone = Instance.new("Frame")
+touchZone.Name = "LeftTouchZone"
+touchZone.Size = UDim2.new(0.5, 0, 1, 0) -- Covers entire left side of your iPad
+touchZone.BackgroundTransparency = 1
+touchZone.Parent = screenGui
+
+local outerCircle = Instance.new("Frame")
+outerCircle.Name = "JoystickOuter"
+outerCircle.Size = UDim2.fromOffset(110, 110)
+outerCircle.Visible = true
+outerCircle.Parent = screenGui
+
+local stick = Instance.new("Frame")
+stick.Name = "JoystickStick"
+stick.Parent = outerCircle
 
 local activeTouchInput = nil
 local joystickCenter = Vector2.new(0, 0)
@@ -26,7 +72,6 @@ end
 
 -- --- AUTOMATIC VISUAL STYLING ENGINE ---
 local function applyBrawlStarsTheme()
-    -- Clear out any old UI modifiers to prevent stacking duplicates
     for _, child in pairs(outerCircle:GetChildren()) do
         if child:IsA("UIStroke") or child:IsA("UICorner") or child:IsA("UIGradient") then child:Destroy() end
     end
@@ -34,7 +79,6 @@ local function applyBrawlStarsTheme()
         if child:IsA("UIStroke") or child:IsA("UICorner") or child:IsA("Frame") then child:Destroy() end
     end
 
-    -- 1. Style the Outer Circle Base (Glassy Dark Navy Blue)
     outerCircle.AnchorPoint = Vector2.new(0.5, 0.5)
     outerCircle.BackgroundColor3 = Color3.fromRGB(14, 35, 82)
     outerCircle.BackgroundTransparency = 0.55
@@ -45,14 +89,13 @@ local function applyBrawlStarsTheme()
     outerCorner.Parent = outerCircle
     
     local outerStroke = Instance.new("UIStroke")
-    outerStroke.Color = Color3.fromRGB(43, 111, 255) -- Vibrant Cyan/Blue Border
+    outerStroke.Color = Color3.fromRGB(43, 111, 255) 
     outerStroke.Thickness = 4
     outerStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     outerStroke.Parent = outerCircle
 
-    -- 2. Style the Inner Knob/Stick (Solid Punchy Blue)
     stick.AnchorPoint = Vector2.new(0.5, 0.5)
-    stick.Size = UDim2.fromScale(0.45, 0.45) -- Scaled nicely to fit the outer ring proportion
+    stick.Size = UDim2.fromScale(0.45, 0.45) 
     stick.BackgroundColor3 = Color3.fromRGB(17, 82, 226)
     stick.BackgroundTransparency = 0
     stick.BorderSizePixel = 0
@@ -63,11 +106,10 @@ local function applyBrawlStarsTheme()
     stickCorner.Parent = stick
     
     local stickStroke = Instance.new("UIStroke")
-    stickStroke.Color = Color3.fromRGB(8, 30, 75) -- Dark High-Contrast Outline
+    stickStroke.Color = Color3.fromRGB(8, 30, 75) 
     stickStroke.Thickness = 3
     stickStroke.Parent = stick
 
-    -- 3. Add Grip Details (The 4 dark indicator cross-dots seen in your screenshot)
     local gripCenter = Instance.new("Frame")
     gripCenter.Name = "GripTexture"
     gripCenter.Size = UDim2.fromScale(0.3, 0.3)
@@ -76,7 +118,6 @@ local function applyBrawlStarsTheme()
     gripCenter.BackgroundTransparency = 1
     gripCenter.Parent = stick
 
-    -- Horizontal Cross Bar
     local barH = Instance.new("Frame")
     barH.Size = UDim2.fromScale(1, 0.25)
     barH.Position = UDim2.fromScale(0.5, 0.5)
@@ -86,7 +127,6 @@ local function applyBrawlStarsTheme()
     barH.Parent = gripCenter
     Instance.new("UICorner", barH).CornerRadius = UDim.new(0.5, 0)
 
-    -- Vertical Cross Bar
     local barV = Instance.new("Frame")
     barV.Size = UDim2.fromScale(0.25, 1)
     barV.Position = UDim2.fromScale(0.5, 0.5)
@@ -97,7 +137,6 @@ local function applyBrawlStarsTheme()
     Instance.new("UICorner", barV).CornerRadius = UDim.new(0.5, 0)
 end
 
--- Initialize default visual position and layout styling
 local function initializeDefaultPosition()
     local metrics = getScaledMetrics()
     local screenHeight = camera.ViewportSize.Y
@@ -107,18 +146,14 @@ local function initializeDefaultPosition()
     outerCircle.Size = UDim2.fromOffset(metrics.maxRadius * 2, metrics.maxRadius * 2)
     outerCircle.Position = UDim2.new(0, joystickCenter.X, 0, joystickCenter.Y)
     stick.Position = UDim2.new(0.5, 0, 0.5, 0)
-    outerCircle.Visible = true 
     
     applyBrawlStarsTheme()
 end
 
--- Run setup immediately on startup
 initializeDefaultPosition()
-
--- Monitor screen size changes (rotation or rescaling on the 13-inch screen)
 camera:GetPropertyChangedSignal("ViewportSize"):Connect(initializeDefaultPosition)
 
--- Enhanced movement mapping for horizontal directional accuracy
+-- Movement Processor
 local function updateMovement(directionVector)
     local character = player.Character
     if not character then return end
@@ -141,7 +176,7 @@ local function updateMovement(directionVector)
     humanoid:Move(moveDirection, false)
 end
 
--- 1. Detect Touch & Dynamic Snapping
+-- 1. Touch began & Snap
 touchZone.InputBegan:Connect(function(input, processed)
     if input.UserInputType == Enum.UserInputType.Touch and not activeTouchInput then
         activeTouchInput = input
@@ -154,7 +189,6 @@ touchZone.InputBegan:Connect(function(input, processed)
         
         joystickCenter = Vector2.new(clampedX, clampedY)
         
-        -- Smoothly snap visuals to thumb location
         TweenService:Create(outerCircle, TweenInfo.new(0.05, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, joystickCenter.X, 0, joystickCenter.Y)
         }):Play()
@@ -162,7 +196,7 @@ touchZone.InputBegan:Connect(function(input, processed)
     end
 end)
 
--- 2. Track Thumb Dragging with Dynamic Base Following
+-- 2. Dragging & Following
 UserInputService.InputChanged:Connect(function(input, processed)
     if input == activeTouchInput and input.UserInputType == Enum.UserInputType.Touch then
         local metrics = getScaledMetrics()
@@ -170,7 +204,6 @@ UserInputService.InputChanged:Connect(function(input, processed)
         local direction = currentPos - joystickCenter
         local distance = direction.Magnitude
         
-        -- Dynamic Base Dragging
         if distance > metrics.maxRadius then
             local excessDistance = distance - metrics.maxRadius
             local tentativeCenter = joystickCenter + (direction.Unit * excessDistance)
@@ -202,13 +235,12 @@ UserInputService.InputChanged:Connect(function(input, processed)
     end
 end)
 
--- 3. Reset and Return to Static Initial Corner Position
+-- 3. Reset
 UserInputService.InputEnded:Connect(function(input, processed)
     if input == activeTouchInput then
         activeTouchInput = nil
         updateMovement(Vector2.new(0, 0))
         
-        -- Snap the layout back home nicely with an ergonomic ease-out tween
         TweenService:Create(outerCircle, TweenInfo.new(0.15, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
             Position = UDim2.new(0, getScaledMetrics().minPaddingX, 0, camera.ViewportSize.Y - getScaledMetrics().minPaddingY)
         }):Play()
@@ -217,7 +249,6 @@ UserInputService.InputEnded:Connect(function(input, processed)
             Position = UDim2.new(0.5, 0, 0.5, 0)
         }):Play()
         
-        -- Lock values safely back to resting state
         joystickCenter = Vector2.new(getScaledMetrics().minPaddingX, camera.ViewportSize.Y - getScaledMetrics().minPaddingY)
     end
 end)
